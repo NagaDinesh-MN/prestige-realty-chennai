@@ -90,5 +90,3 @@ npx vercel --prod
 - **RERA:** TN/01/Building/0026/2024
 
 ---
-
-*Built with ❤️ using [Anthropic Claude](https://claude.ai)*
