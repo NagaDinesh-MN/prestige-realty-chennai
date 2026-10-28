@@ -958,7 +958,7 @@
       showStatus('error', '⚠ Please fill in your first name, last name, and phone number.');
       return;
     }
-    const phoneRegex = /^[+]?[\\d\\s\\-()]{8,}$/;
+    const phoneRegex = /^[+]?[\d\s\-()]{8,}$/;
     if (!phoneRegex.test(fields.phone)) {
       showStatus('error', '⚠ Please enter a valid phone number.');
       return;
