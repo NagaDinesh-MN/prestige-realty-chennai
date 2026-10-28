@@ -939,29 +939,26 @@
   });
 
   /* ═══════════════════════════════════════
-     AIRTABLE FORM SUBMISSION via Claude MCP
+     WEBSITE ENQUIRY SUBMISSION TO N8N
   ═══════════════════════════════════════ */
   async function submitToAirtable() {
-    const btn    = document.getElementById('form-btn');
-    const status = document.getElementById('form-status');
+    const btn = document.getElementById('form-btn');
 
-    // Collect all form field values
     const fields = {
-      first    : document.getElementById('f-first').value.trim(),
-      last     : document.getElementById('f-last').value.trim(),
-      phone    : document.getElementById('f-phone').value.trim(),
-      email    : document.getElementById('f-email').value.trim(),
-      type     : document.getElementById('f-type').value.trim(),
-      location : document.getElementById('f-location').value.trim(),
-      message  : document.getElementById('f-message').value.trim(),
+      first: document.getElementById('f-first').value.trim(),
+      last: document.getElementById('f-last').value.trim(),
+      phone: document.getElementById('f-phone').value.trim(),
+      email: document.getElementById('f-email').value.trim(),
+      type: document.getElementById('f-type').value.trim(),
+      location: document.getElementById('f-location').value.trim(),
+      message: document.getElementById('f-message').value.trim(),
     };
 
-    // Client-side validation
     if (!fields.first || !fields.last || !fields.phone) {
       showStatus('error', '⚠ Please fill in your first name, last name, and phone number.');
       return;
     }
-    const phoneRegex = /^[+]?[\d\s\-()]{8,}$/;
+    const phoneRegex = /^[+]?[\\d\\s\\-()]{8,}$/;
     if (!phoneRegex.test(fields.phone)) {
       showStatus('error', '⚠ Please enter a valid phone number.');
       return;
@@ -971,64 +968,33 @@
     btn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:spin 0.8s linear infinite"><path d="M21 12a9 9 0 1 1-6.22-8.56"/></svg> Submitting…</span>';
     showStatus('', '');
 
-    // Build the exact Airtable record payload
-    // All form fields mapped explicitly to Airtable column names
-    const airtablePrompt = `You are a backend data assistant for Prestige Realty Chennai.
-
-Create a new record in the Airtable base in the table named "Leads" with EXACTLY these field values:
-
-Field: "Name"               Value: "${fields.first} ${fields.last}"
-Field: "Phone"              Value: "${fields.phone}"
-Field: "Email"              Value: "${fields.email || 'Not provided'}"
-Field: "Enquiry Type"       Value: "${fields.type || 'General Enquiry'}"
-Field: "Preferred Location" Value: "${fields.location || 'Not specified'}"
-Field: "Message"            Value: "${fields.message || 'No message provided'}"
-Field: "Source"             Value: "Website Contact Form"
-Field: "Status"             Value: "New"
-Field: "Submitted At"       Value: "${new Date().toLocaleString('en-IN', {timeZone:'Asia/Kolkata'})}"
-
-Use the Airtable MCP createRecord tool now. Return a short confirmation once done.`;
+    const formBody = new URLSearchParams({
+      enquiry_id: 'prestige-' + (window.crypto && crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2)),
+      name: fields.first + ' ' + fields.last,
+      phone: fields.phone,
+      email: fields.email,
+      property_type: fields.type || 'General Enquiry',
+      location: fields.location || 'Not specified',
+      message: fields.message || 'Website enquiry from Prestige Realty Chennai.',
+    });
 
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 512,
-          system: "You are a data entry assistant. When asked to create an Airtable record, use the Airtable MCP tool immediately with the exact fields provided. Do not ask for clarification.",
-          messages: [{ role: "user", content: airtablePrompt }],
-          mcp_servers: [{
-            type: "url",
-            url: "https://mcp.airtable.com/mcp",
-            name: "airtable-mcp"
-          }]
-        })
+      const response = await fetch('https://nagadinesh.app.n8n.cloud/webhook/villa-website-enquiry', {
+        method: 'POST',
+        body: formBody,
       });
+      const result = await response.json();
 
-      const data = await response.json();
-      console.log("Airtable API Response:", JSON.stringify(data, null, 2));
-
-      // Check all content block types for success indicators
-      const blocks = data.content || [];
-      const hasToolResult = blocks.some(b => b.type === 'mcp_tool_result');
-      const hasToolUse    = blocks.some(b => b.type === 'mcp_tool_use');
-      const hasSuccessText = blocks
-        .filter(b => b.type === 'text')
-        .some(b => /creat|record|success|added|saved|done/i.test(b.text));
-
-      if (hasToolResult || hasToolUse || hasSuccessText || response.ok) {
-        showStatus('success', '✓ Thank you! Your enquiry has been received. Our consultant will call you within the hour.');
-        clearForm();
-        btn.innerHTML = '✓ Enquiry Submitted';
-      } else {
-        console.warn("Unexpected response — treating as failure:", data);
-        throw new Error('No confirmation from Airtable');
+      if (!response.ok || result.status !== 'received') {
+        throw new Error('The enquiry was not confirmed by the workflow.');
       }
 
+      showStatus('success', '✓ Thank you! Your enquiry has been received. Our consultant will call you within the hour.');
+      clearForm();
+      btn.innerHTML = '✓ Enquiry Submitted';
     } catch (err) {
-      console.error("Form submission error:", err);
-      showStatus('error', '⚠ Something went wrong submitting your form. Please call us at +91 98400 12345 or email info@prestigerealty.in');
+      console.error('Enquiry submission error:', err);
+      showStatus('error', '⚠ We could not confirm your enquiry. Please call us at +91 98400 12345 or email info@prestigerealty.in');
       btn.disabled = false;
       btn.textContent = 'Submit Enquiry →';
     }
